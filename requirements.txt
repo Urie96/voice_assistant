@@ -1,0 +1,5 @@
+dashscope
+numpy
+openwakeword
+sounddevice
+soundfile

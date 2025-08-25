@@ -3,3 +3,5 @@ numpy
 openwakeword
 sounddevice
 soundfile
+langchain-core
+langchain-openai

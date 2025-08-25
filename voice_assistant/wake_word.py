@@ -1,44 +1,52 @@
-import sounddevice as sd
+import logging
+import platform
+import time
+from typing import Any, Iterator, cast
+
 import numpy as np
-import openwakeword
+from numpy.typing import NDArray
 from openwakeword.model import Model
 
-# Get microphone stream
-CHANNELS = 1
-RATE = 16000
-CHUNK = 512
-
-openwakeword.utils.download_models()
+# openwakeword.utils.download_models()  # type: ignore
 
 
 class WakeWord:
-    def __init__(self, callback, threshold=0.5):
-        self.model = Model(inference_framework="onnx")
+    def __init__(
+        self,
+        recording_stream: Iterator[NDArray[np.float64]],
+        threshold,
+    ):
+        enable_speex_noise_suppression = False
+        if platform.system().lower() == "linux":
+            logging.info("enable speex noise suppression in linux")
+            enable_speex_noise_suppression = True
+        self.model = Model(
+            wakeword_models=["./onnx/xiao_ai.onnx"],
+            inference_framework="onnx",
+            enable_speex_noise_suppression=enable_speex_noise_suppression,
+        )
         self.threshold = threshold
-        self.callback = callback
-        pass
 
-    def write(self, data) -> None:
-        if len(data.shape) == 2:
-            data = data[:, 0]
-        if data.dtype == np.float32:
+        def transform(data):
+            if len(data.shape) == 2:
+                data = data[:, 0]
             data = np.clip(data, -1.0, 1.0)
             data = (data * 32767).astype(np.int16)
-        prediction = self.model.predict(data)
-        for name, prob in prediction.items():
-            if prob > self.threshold:
-                print(f"Wake word: {name}, score={prob:.2f}")
-                self.callback(name)
-                self.model.reset()
+            return data
 
+        self.stream = (transform(data) for data in recording_stream)
+        pass
 
-if __name__ == "__main__":
-    with sd.InputStream(samplerate=RATE, channels=CHANNELS, blocksize=CHUNK) as stream:
-        print("#" * 100)
-        print("Listening for wakewords...")
-        print("#" * 100)
-        wake_word = WakeWord(callback=lambda name: print(f"callback: {name}"))
+    def wait(self):
+        logging.info("开始检测唤醒词...")
+        self.model.reset()
+        start = time.time()
+        for data in self.stream:
+            prediction = self.model.predict(data)
+            prediction = cast(dict[str, Any], prediction)
 
-        while True:
-            data, _ = stream.read(CHUNK)
-            wake_word.write(data[:, 0])
+            for name, prob in prediction.items():
+                logging.debug(f"Wake word: {name}, score={prob:.2f}")
+                if time.time() - start > 2 and prob > self.threshold:
+                    logging.info(f"Wake word: {name}, score={prob:.2f}")
+                    return name

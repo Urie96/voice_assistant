@@ -1,41 +1,43 @@
-#!/usr/bin/env python3
-
+import logging
 import subprocess
+from typing import Iterator
 
 
-class RealtimeMp3Player:
-    def __init__(self):
-        self.ffmpeg_process = subprocess.Popen(
-            [
-                "ffplay",
-                "-autoexit",
-                "-nodisp",
-                "-i",
-                "-",
-            ],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )  # initialize ffmpeg to decode mp3
-        print("mp3 audio player is started")
+def stream_play(mp3_stream: Iterator[bytes]):
+    ffmpeg_process = subprocess.Popen(
+        [
+            "ffplay",
+            "-autoexit",
+            "-nodisp",
+            "-i",
+            "-",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )  # initialize ffmpeg to decode mp3
+    logging.info("mp3 audio player is started")
 
-    def stop(self):
+    if ffmpeg_process.stdin is None:
+        return
+
+    first = True
+
+    for data in mp3_stream:
+        if first:
+            logging.info("mp3 audio player get first mp3 frame")
+            first = False
         try:
-            print("stopping mp3 audio player")
-            self.ffmpeg_process.stdin.close()
-            self.ffmpeg_process.wait()
-            if self.ffmpeg_process:
-                self.ffmpeg_process.terminate()
-            print("mp3 audio player is stopped")
+            ffmpeg_process.stdin.write(data)
+            ffmpeg_process.stdin.flush()
         except subprocess.CalledProcessError as e:
             # Capturing ffmpeg exceptions, printing error details
-            print(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
 
-    def write(self, data: bytes) -> None:
-        # print('write audio data:', len(data))
-        try:
-            self.ffmpeg_process.stdin.write(data)
-            self.ffmpeg_process.stdin.flush()
-        except subprocess.CalledProcessError as e:
-            # Capturing ffmpeg exceptions, printing error details
-            print(f"An error occurred: {e}")
+    try:
+        ffmpeg_process.stdin.close()
+        ffmpeg_process.wait()
+        logging.info("mp3 audio player is stopped")
+    except subprocess.CalledProcessError as e:
+        # Capturing ffmpeg exceptions, printing error details
+        logging.error(f"An error occurred: {e}")

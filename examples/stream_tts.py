@@ -1,6 +1,6 @@
 import time
 
-from voice_assistant.audio_player import stream_play
+from voice_assistant.audio_player import _stream_play
 from voice_assistant.stream_tts import stream_tts
 
 
@@ -26,4 +26,4 @@ mp3_stream = stream_tts(
         delay=2.0,
     )
 )
-stream_play(mp3_stream)
+_stream_play(mp3_stream)

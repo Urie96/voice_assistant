@@ -4,18 +4,22 @@ let
     config = { };
     overlays = [ ];
   };
+
+  python-with-pkg = pkgs.python312.withPackages (
+    ps: with ps; [
+      pip
+    ]
+  );
 in
 pkgs.mkShellNoCC {
   venvDir = ".venv";
   buildInputs = with pkgs; [ portaudio ];
   packages =
-    with pkgs;
     [
-      python311
-      clang
+      python-with-pkg
+      python-with-pkg.pkgs.venvShellHook
     ]
-    ++ (with pkgs.python311Packages; [
-      pip
-      venvShellHook
+    ++ (with pkgs; [
+      clang
     ]);
 }
